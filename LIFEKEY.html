@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LIFEKEY 5.0</title>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#071426;color:#f5f8ff;font-family:Arial,sans-serif}
+button,input,select{font:inherit}
+button{border:0;border-radius:10px;padding:12px 16px;background:#087cff;color:white;font-weight:bold;cursor:pointer}
+input,select{width:100%;padding:13px;margin:7px 0;background:#10243d;border:1px solid #294563;border-radius:10px;color:white}
+header{display:flex;align-items:center;justify-content:space-between;padding:17px;background:#0c1d33;border-bottom:1px solid #1e3b5b}
+.logo{font-size:22px;font-weight:900;color:#39a4ff;letter-spacing:1px}
+.page{max-width:850px;margin:auto;padding:18px}
+.card{background:#10243d;border:1px solid #244363;border-radius:16px;padding:17px;margin:14px 0}
+h2{font-size:20px;margin-top:5px}
+.small{color:#a9bfd8;font-size:13px}
+.hidden{display:none!important}
+.primary{width:100%;margin-top:8px}
+.secondary{background:#203c5b}
+.danger{background:#c43b50}
+.menu{position:absolute;right:12px;top:60px;background:#10243d;padding:12px;border-radius:12px;z-index:5;box-shadow:0 8px 25px #0008}
+.menu button{display:block;width:100%;margin:5px 0;text-align:left}
+.item{background:#142d49;padding:14px;border-radius:12px;margin:10px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row button{flex:1}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat div{background:#142d49;padding:13px;border-radius:12px;text-align:center}
+.stat b{font-size:22px;color:#40a8ff;display:block}
+#splash{position:fixed;inset:0;background:radial-gradient(circle,#123c69,#061326 70%);display:flex;align-items:center;justify-content:center;z-index:99;flex-direction:column}
+.splashLogo{font-size:42px;font-weight:900;color:#48adff;animation:zoom 1.5s infinite alternate}
+@keyframes zoom{from{transform:scale(.88);opacity:.6}to{transform:scale(1.08);opacity:1}}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#183958;padding:12px 18px;border-radius:10px;display:none;z-index:200;max-width:90%;text-align:center}
+@media(max-width:500px){.page{padding:12px}.stat b{font-size:18px}}
+</style>
+</head>
+<body>
+
+<div id="splash">
+ <div class="splashLogo">LIFEKEY</div>
+ <p>YOUR LIFE. YOUR PRODUCTS. YOUR KEY.</p>
+</div>
+
+<header>
+ <div class="logo">LIFEKEY <small style="font-size:10px">5.0</small></div>
+ <button class="secondary" onclick="toggleMenu()">☰</button>
+</header>
+
+<div id="menu" class="menu hidden">
+ <button onclick="showPage('home')">🏠 Dashboard</button>
+ <button onclick="showPage('vault')">📦 Product Vault</button>
+ <button onclick="showPage('scanner')">📷 Scanner</button>
+ <button onclick="showPage('history')">🔧 Repair History</button>
+ <button onclick="showPage('profile')">👤 My Profile</button>
+ <button onclick="logout()">↪ Logout</button>
+</div>
+
+<section id="authPage" class="page hidden">
+ <div class="card">
+  <h2>Welcome to LIFEKEY</h2>
+  <p class="small">Login to manage your products securely.</p>
+  <div class="row">
+   <button onclick="authMode('login')">Login</button>
+   <button class="secondary" onclick="authMode('register')">Create Account</button>
+  </div>
+  <div id="nameBox" class="hidden">
+   <input id="regName" placeholder="Your full name">
+  </div>
+  <input id="email" type="email" placeholder="Email address">
+  <input id="password" type="password" placeholder="Password (minimum 6 characters)">
+  <button class="primary" onclick="emailAuth()" id="authButton">Login</button>
+  <p class="small" style="text-align:center">OR LOGIN WITH MOBILE OTP</p>
+  <input id="phone" type="tel" placeholder="Mobile number e.g. +919876543210">
+  <div id="recaptcha-container"></div>
+  <button class="primary secondary" id="sendOtpButton" onclick="sendOTP()">Send OTP</button>
+  <div id="otpBox" class="hidden">
+   <input id="otp" placeholder="Enter OTP">
+   <button class="primary" onclick="verifyOTP()">Verify OTP & Login</button>
+  </div>
+  <p class="small">Your account is managed by Firebase Authentication.</p>
+ </div>
+</section>
+
+<main id="appPage" class="page hidden">
+ <section id="home">
+  <div class="card">
+   <h2 id="welcome">Welcome!</h2>
+   <p class="small">Your personal product management space.</p>
+   <div class="stat">
+    <div><b id="totalCount">0</b><span class="small">Products</span></div>
+    <div><b id="activeCount">0</b><span class="small">In Warranty</span></div>
+    <div><b id="expiredCount">0</b><span class="small">Expired</span></div>
+   </div>
+  </div>
+  <div class="row">
+   <button onclick="showPage('vault')">📦 My Products</button>
+   <button class="secondary" onclick="showPage('scanner')">📷 Scan Code</button>
+  </div>
+  <div class="card">
+   <h2>Quick Information</h2>
+   <p class="small">Save your bills, warranty dates and repair details in one place.</p>
+  </div>
+ </section>
+
+ <section id="vault" class="hidden">
+  <div class="card">
+   <h2>📦 Product Vault</h2>
+   <input id="pname" placeholder="Product name">
+   <input id="pbrand" placeholder="Brand">
+   <select id="pcat">
+    <option>Electronics</option><option>Home Appliances</option>
+    <option>Mobile</option><option>Computer</option><option>Other</option>
+   </select>
+   <input id="pmodel" placeholder="Model number">
+   <input id="pserial" placeholder="Serial number">
+   <input id="purchase" type="date" aria-label="Purchase date">
+   <label class="small">Warranty end date</label>
+   <input id="warranty" type="date">
+   <input id="price" type="number" placeholder="Purchase price">
+   <input id="bill" placeholder="Bill / invoice number (optional)">
+   <button class="primary" onclick="addProduct()">+ Add Product</button>
+  </div>
+  <div class="card">
+   <h2>My Products</h2>
+   <input id="search" placeholder="Search product..." oninput="renderProducts()">
+   <select id="filter" onchange="renderProducts()">
+    <option value="all">All Categories</option>
+    <option>Electronics</option><option>Home Appliances</option>
+    <option>Mobile</option><option>Computer</option><option>Other</option>
+   </select>
+   <div id="productList"></div>
+  </div>
+ </section>
+
+ <section id="scanner" class="hidden">
+  <div class="card">
+   <h2>📷 QR / Barcode Scanner</h2>
+   <p class="small">Allow camera permission to scan a code.</p>
+   <div id="reader"></div>
+   <p id="scanResult" class="small"></p>
+   <button class="secondary" onclick="stopScanner()">Stop Scanner</button>
+  </div>
+ </section>
+
+ <section id="history" class="hidden">
+  <div class="card">
+   <h2>🔧 Repair History</h2>
+   <input id="rproduct" placeholder="Product name">
+   <input id="rdate" type="date">
+   <input id="rdesc" placeholder="Repair details">
+   <input id="rcost" type="number" placeholder="Repair cost">
+   <button class="primary" onclick="addRepair()">Save Repair Record</button>
+  </div>
+  <div class="card"><h2>Previous Repairs</h2><div id="repairList"></div></div>
+ </section>
+
+ <section id="profile" class="hidden">
+  <div class="card">
+   <h2>👤 My Profile</h2>
+   <p class="small">Name</p><input id="profileName">
+   <p class="small">Email</p><input id="profileEmail" disabled>
+   <p class="small">Mobile number</p><input id="profilePhone" placeholder="Mobile number">
+   <button class="primary" onclick="saveProfile()">Save Profile</button>
+   <p class="small">Mobile number entered here is profile information only. It is not verified unless linked through OTP authentication.</p>
+   <button class="danger primary" onclick="logout()">Logout</button>
+  </div>
+ </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const firebaseConfig = {
+ apiKey: "AIzaSyBd1Vq6EOZiOPpen9ciprnPVjjymFABo1A",
+ authDomain: "lifekey-74946.firebaseapp.com",
+ projectId: "lifekey-74946",
+ storageBucket: "lifekey-74946.firebasestorage.app",
+ messagingSenderId: "76480068587",
+ appId: "1:76480068587:web:8de37f50c491604cfef7ae",
+ measurementId: "G-XM3SL4SMGC"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e=>console.error(e));
+
+let currentUser=null, mode="login", confirmationResult=null, scanner=null;
+let products=[], repairs=[];
+
+function toast(msg){
+ const t=document.getElementById("toast");
+ t.textContent=msg;t.style.display="block";
+ setTimeout(()=>t.style.display="none",4500);
+}
+function toggleMenu(){document.getElementById("menu").classList.toggle("hidden")}
+function authMode(m){
+ mode=m;
+ document.getElementById("nameBox").classList.toggle("hidden",m!=="register");
+ document.getElementById("authButton").textContent=m==="register"?"Create Account":"Login";
+}
+function emailAuth(){
+ const email=document.getElementById("email").value.trim();
+ const pass=document.getElementById("password").value;
+ if(!email||!pass)return toast("Enter email and password");
+ if(pass.length<6)return toast("Password must be at least 6 characters");
+ if(mode==="register"){
+  const name=document.getElementById("regName").value.trim();
+  if(!name)return toast("Enter your name");
+  auth.createUserWithEmailAndPassword(email,pass)
+   .then(c=>c.user.updateProfile({displayName:name}))
+   .then(()=>toast("Account created"))
+   .catch(e=>toast((e.code||"ERROR")+" : "+e.message));
+ }else{
+  auth.signInWithEmailAndPassword(email,pass)
+   .catch(e=>toast((e.code||"ERROR")+" : "+e.message));
+ }
+}
+
+/* UPDATED MOBILE OTP LOGIN */
+async function sendOTP(){
+ const phone=document.getElementById("phone").value.trim();
+ const btn=document.getElementById("sendOtpButton");
+
+ if(!/^\+[1-9]\d{7,14}$/.test(phone)){
+  return toast("Number +91 ke saath likho. Example: +919876543210");
+ }
+
+ btn.disabled=true;
+ btn.textContent="Please wait...";
+
+ try{
+  if(window.recaptchaVerifier){
+   try{window.recaptchaVerifier.clear()}catch(x){}
+   window.recaptchaVerifier=null;
+  }
+
+  document.getElementById("recaptcha-container").innerHTML="";
+
+  window.recaptchaVerifier=new firebase.auth.RecaptchaVerifier(
+   "recaptcha-container",
+   {size:"normal"}
+  );
+
+  await window.recaptchaVerifier.render();
+
+  confirmationResult=await auth.signInWithPhoneNumber(
+   phone,
+   window.recaptchaVerifier
+  );
+
+  document.getElementById("otpBox").classList.remove("hidden");
+  toast("OTP sent successfully! SMS check karo.");
+
+ }catch(e){
+  console.error("PHONE AUTH ERROR:",e);
+  toast((e.code||"ERROR")+" : "+e.message);
+  if(window.recaptchaVerifier){
+   try{window.recaptchaVerifier.clear()}catch(x){}
+   window.recaptchaVerifier=null;
+  }
+  document.getElementById("recaptcha-container").innerHTML="";
+ }finally{
+  btn.disabled=false;
+  btn.textContent="Send OTP";
+ }
+}
+
+async function verifyOTP(){
+ const code=document.getElementById("otp").value.trim();
+
+ if(!confirmationResult){
+  return toast("Pehle Send OTP par click karo.");
+ }
+ if(!code){
+  return toast("OTP enter karo.");
+ }
+
+ try{
+  await confirmationResult.confirm(code);
+  confirmationResult=null;
+  document.getElementById("otp").value="";
+  document.getElementById("otpBox").classList.add("hidden");
+  toast("Mobile login successful!");
+ }catch(e){
+  console.error("OTP VERIFY ERROR:",e);
+  toast((e.code||"ERROR")+" : "+e.message);
+ }
+}
+
+function logout(){auth.signOut().catch(e=>toast(e.message))}
+function getKey(){return currentUser?"lifekey_"+currentUser.uid:""}
+function loadData(){
+ products=JSON.parse(localStorage.getItem(getKey()+"_products")||"[]");
+ repairs=JSON.parse(localStorage.getItem(getKey()+"_repairs")||"[]");
+}
+function saveData(){
+ localStorage.setItem(getKey()+"_products",JSON.stringify(products));
+ localStorage.setItem(getKey()+"_repairs",JSON.stringify(repairs));
+}
+function showPage(id){
+ ["home","vault","scanner","history","profile"].forEach(p=>
+  document.getElementById(p).classList.toggle("hidden",p!==id));
+ document.getElementById("menu").classList.add("hidden");
+ if(id==="vault")renderProducts();
+ if(id==="history")renderRepairs();
+ if(id==="scanner")startScanner();
+ else stopScanner();
+}
+function addProduct(){
+ const name=document.getElementById("pname").value.trim();
+ if(!name)return toast("Enter product name");
+ const p={
+  id:Date.now(),name,brand:document.getElementById("pbrand").value,
+  category:document.getElementById("pcat").value,
+  model:document.getElementById("pmodel").value,
+  serial:document.getElementById("pserial").value,
+  purchase:document.getElementById("purchase").value,
+  warranty:document.getElementById("warranty").value,
+  price:document.getElementById("price").value,
+  bill:document.getElementById("bill").value
+ };
+ products.push(p);saveData();
+ document.querySelectorAll("#vault input").forEach(x=>x.value="");
+ renderProducts();updateStats();toast("Product saved successfully");
+}
+function warrantyStatus(date){
+ if(!date)return "No warranty date";
+ const d=new Date(date+"T23:59:59");
+ const days=Math.ceil((d-new Date())/86400000);
+ if(days<0)return "Expired";
+ if(days===0)return "Expires today";
+ return "Active · "+days+" days left";
+}
+function renderProducts(){
+ const q=(document.getElementById("search")?.value||"").toLowerCase();
+ const f=document.getElementById("filter")?.value||"all";
+ const list=document.getElementById("productList");
+ list.innerHTML="";
+ products.filter(p=>(p.name+" "+p.brand+" "+p.model).toLowerCase().includes(q)&&(f==="all"||p.category===f)).forEach(p=>{
+  const div=document.createElement("div");div.className="item";
+  const title=document.createElement("b");title.textContent=p.name;div.appendChild(title);
+  const info=document.createElement("p");info.className="small";
+  info.textContent=[p.brand,p.category,p.model,p.serial,"Warranty: "+warrantyStatus(p.warranty),"Price: "+(p.price||"Not added")].filter(Boolean).join(" · ");
+  div.appendChild(info);
+  const del=document.createElement("button");del.className="danger";del.textContent="Delete";
+  del.onclick=()=>{if(confirm("Delete this product?")){products=products.filter(x=>x.id!==p.id);saveData();renderProducts();updateStats()}};
+  div.appendChild(del);list.appendChild(div);
+ });
+ if(!list.children.length)list.textContent="No products found.";
+}
+function updateStats(){
+ const active=products.filter(p=>p.warranty&&new Date(p.warranty+"T23:59:59")>=new Date()).length;
+ document.getElementById("totalCount").textContent=products.length;
+ document.getElementById("activeCount").textContent=active;
+ document.getElementById("expiredCount").textContent=products.filter(p=>p.warranty&&new Date(p.warranty+"T23:59:59")<new Date()).length;
+}
+function addRepair(){
+ const name=document.getElementById("rproduct").value.trim();
+ const desc=document.getElementById("rdesc").value.trim();
+ if(!name||!desc)return toast("Enter product and repair details");
+ repairs.unshift({id:Date.now(),name,date:document.getElementById("rdate").value,desc,cost:document.getElementById("rcost").value});
+ saveData();renderRepairs();toast("Repair record saved");
+ ["rproduct","rdate","rdesc","rcost"].forEach(id=>document.getElementById(id).value="");
+}
+function renderRepairs(){
+ const list=document.getElementById("repairList");list.innerHTML="";
+ repairs.forEach(r=>{
+  const d=document.createElement("div");d.className="item";
+  const b=document.createElement("b");b.textContent=r.name;d.appendChild(b);
+  const p=document.createElement("p");p.className="small";p.textContent=(r.date||"No date")+" · "+r.desc+" · Cost: "+(r.cost||"Not added");d.appendChild(p);
+  const del=document.createElement("button");del.className="danger";del.textContent="Delete";
+  del.onclick=()=>{repairs=repairs.filter(x=>x.id!==r.id);saveData();renderRepairs()};
+  d.appendChild(del);list.appendChild(d);
+ });
+ if(!list.children.length)list.textContent="No repair records yet.";
+}
+function saveProfile(){
+ const name=document.getElementById("profileName").value.trim();
+ const phone=document.getElementById("profilePhone").value.trim();
+ const updates={};
+ if(name)updates.displayName=name;
+ currentUser.updateProfile(updates).then(()=>{
+  localStorage.setItem("lifekey_profile_"+currentUser.uid,JSON.stringify({phone}));
+  document.getElementById("welcome").textContent="Welcome, "+(name||"User")+"!";
+  toast("Profile saved");
+ }).catch(e=>toast(e.message));
+}
+function startScanner(){
+ if(scanner)return;
+ if(typeof Html5Qrcode==="undefined"){
+  document.getElementById("scanResult").textContent="Scanner library could not load.";
+  return;
+ }
+ scanner=new Html5Qrcode("reader");
+ scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:230,height:230}},
+  text=>{document.getElementById("scanResult").textContent="Scanned: "+text;stopScanner();},
+  ()=>{}
+ ).catch(e=>{document.getElementById("scanResult").textContent="Camera error: "+e;scanner=null});
+}
+function stopScanner(){
+ if(scanner){
+  const s=scanner;scanner=null;
+  s.stop().then(()=>s.clear()).catch(()=>{});
+ }
+}
+auth.onAuthStateChanged(user=>{
+ currentUser=user;
+ if(user){
+  loadData();
+  document.getElementById("authPage").classList.add("hidden");
+  document.getElementById("appPage").classList.remove("hidden");
+  document.getElementById("welcome").textContent="Welcome, "+(user.displayName||"User")+"!";
+  document.getElementById("profileName").value=user.displayName||"";
+  document.getElementById("profileEmail").value=user.email||"Phone account";
+  const saved=JSON.parse(localStorage.getItem("lifekey_profile_"+user.uid)||"{}");
+  document.getElementById("profilePhone").value=saved.phone||user.phoneNumber||"";
+  updateStats();showPage("home");
+ }else{
+  document.getElementById("appPage").classList.add("hidden");
+  document.getElementById("authPage").classList.remove("hidden");
+ }
+});
+setTimeout(()=>document.getElementById("splash").classList.add("hidden"),2500);
+</script>
+</body>
+</html>
